@@ -1,0 +1,33 @@
+# This file is used to configure logging and agents behaviour.
+#
+# The first part consists of Wandb info used to log experiments.
+# Changing it adjusts the way logging is stored and displayed.
+#
+# The second part (config) is used to change hyperparameter settings of agents.
+# Changing it adjusts the way agents behave and learn.
+project: "DM Control Spin"
+name: "SAC"
+dir: "logs"
+notes: "Training DM Control Spin using SAC"
+monitor_gym: "False"
+config:
+  # Environment, logging and saving control
+  environment: "dm_control/finger-spin-v0"    # Environment to use
+  algorithm: "SAC"                            # What kind of algorithm to use?
+  save_dir: "models"                          # Where to save model?
+  save_name: "sac_control_spin"               # Model name
+  save_interval: 50                           # How many previous episodes will be used to calculate mean reward?
+  total_steps: 1_000_000                      # For how many steps will the agent train?
+  # Algorithm hyperparameters
+  memory_size: 1000000                        # How many steps can fit into the memory?
+  learning_rate_q: 0.0003                     # Learning rate for Q-Network
+  learning_rate_actor: 0.0003                 # Learning rate for Actor network
+  learning_rate_alpha: 0.0003                 # Learning rate for Alpha (entropy)
+  tau: 0.005                                  # Interpolation factor in target network updates
+  warmup_steps: 10_000                        # How many steps before agents starts optimising?
+  batch_size: 256                             # How many steps are sampled from memory when optimising?
+  gamma: 0.99                                 # Discount factor
+  alpha: "auto"                               # Entropy regularization coefficient
+  target_entropy: "auto"                      # Target entropy value
+  network_size: 256                           # Number of neurons in each hidden layer
+  normalize_rewards: 0                        # Whether to normalize rewards or not (1 = True, 0 = False)

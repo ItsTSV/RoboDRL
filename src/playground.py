@@ -13,8 +13,9 @@ from textual.widgets import (
     Input,
     Button,
     RichLog,
+    ProgressBar,
 )
-from textual.containers import VerticalScroll
+from textual.containers import VerticalScroll, Horizontal
 from textual.validation import Regex
 from src.utils.data_lab import generate_distribution_plot, generate_scatter_plot
 from src.shared.wandb_wrapper import WandbWrapper
@@ -33,6 +34,23 @@ class RlPlayground(App):
             border: solid $primary;
             margin-top: 1;
             background: $surface;
+        }
+        
+        .row {
+        height: auto;           
+        width: 100%;  
+        margin-bottom: 1;     
+        align: left middle;
+        }
+        
+        Button {
+        margin-left: 2;
+        }
+        
+        ProgressBar {
+        width: 1fr;           
+        margin-left: 2; 
+        align: left middle;
         }
         """
 
@@ -96,10 +114,14 @@ class RlPlayground(App):
 
             # Additional settings
             yield Markdown("# Additional Settings")
-            yield Checkbox("Generate CSV Log", id="csv_log_checkbox")
-            yield Checkbox("Generate Chart Report", id="chart_report_checkbox")
+            with Horizontal(classes="row"):
+                yield Checkbox("Generate CSV Log", id="csv_log_checkbox")
+                yield Checkbox("Generate Chart Report", id="chart_report_checkbox")
 
-            yield Button("Confirm and run", id="run_button", variant="primary")
+            with Horizontal(classes="row"):
+                yield Button("Confirm and run", id="run_button", variant="primary")
+            with Horizontal(classes="row"):
+                yield ProgressBar(show_eta=False)
             yield RichLog(id="debug_output", markup=True, wrap=True)
 
         yield Footer()
@@ -135,6 +157,9 @@ class RlPlayground(App):
         elif event.checkbox.id == "delay_rendering_checkbox":
             self.delay_rendering = bool(event.value)
 
+    def _update_progress_bar(self) -> None:
+        self.query_one(ProgressBar).advance(1)
+
     def action_toggle_dark(self) -> None:
         """An action to toggle dark mode"""
         self.theme = (
@@ -144,12 +169,12 @@ class RlPlayground(App):
     def run_trials(self):
         """Sets up the whole init-trial-report data process"""
         self.call_later(self.clear_log)
+        self.query_one(ProgressBar).update(progress=0, total=self.num_trials)
 
         if not self._validate_configuration():
             return
 
         self.call_later(self.log_summary)
-
         try:
             wdb = WandbWrapper(self.config_path, mode="disabled")
             env = self._setup_environment(wdb)
@@ -157,7 +182,9 @@ class RlPlayground(App):
             results_df = self._execute_trial_loop(agent)
             self._process_results(results_df)
         except Exception as e:
-            self.call_later(self.log_message, f"[bold red]Critical Error:[/bold red] {e}")
+            self.call_later(
+                self.log_message, f"[bold red]Critical Error:[/bold red] {e}"
+            )
         finally:
             env.close()
             wdb.finish()
@@ -222,27 +249,42 @@ class RlPlayground(App):
                 reward = float(reward[0])
 
             success_rate = info.get("success_rate", -1)
-            data.append({
-                "Trial": i,
-                "Reward": reward,
-                "Steps": steps,
-                "Success Rate": success_rate
-            })
+            data.append(
+                {
+                    "Trial": i,
+                    "Reward": reward,
+                    "Steps": steps,
+                    "Success Rate": success_rate,
+                }
+            )
 
             self._log_trial_status(i, reward, success_rate)
+            self._update_progress_bar()
 
         return pd.DataFrame(data)
 
     def _process_results(self, df: pd.DataFrame):
         """Calculates stats, saves CSV and generates charts."""
-        self.call_later(self.log_message, f"[bold magenta]Average Reward:[/bold magenta] {df['Reward'].mean()}")
-        self.call_later(self.log_message, f"[bold magenta]Reward Std Dev:[/bold magenta] {df['Reward'].std()}")
+        self.call_later(
+            self.log_message,
+            f"[bold magenta]Average Reward:[/bold magenta] {df['Reward'].mean()}",
+        )
+        self.call_later(
+            self.log_message,
+            f"[bold magenta]Reward Std Dev:[/bold magenta] {df['Reward'].std()}",
+        )
 
         success_rate = df["Success Rate"].mean()
         if success_rate != -1:
-            self.call_later(self.log_message,
-                            f"[bold magenta]Avg Success Rate:[/bold magenta] {df['Success Rate'].mean()}")
-            msg = "[bold green] Success! [/bold green]" if success_rate >= 0.9 else "[bold red] Failure! [/bold red]"
+            self.call_later(
+                self.log_message,
+                f"[bold magenta]Avg Success Rate:[/bold magenta] {df['Success Rate'].mean()}",
+            )
+            msg = (
+                "[bold green] Success! [/bold green]"
+                if success_rate >= 0.9
+                else "[bold red] Failure! [/bold red]"
+            )
             self.call_later(self.log_message, msg)
 
         output_dir = self.project_root / "outputs"

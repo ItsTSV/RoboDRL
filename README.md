@@ -70,3 +70,12 @@ Because moving images are a bit more interesting than static text ;)
 | Hopper-v5  |           Swimmer-v5            |             HalfCheetah-v5               | Walker2D-v5 |
 | :---: |:-------------------------------:|:----------------------------------------:| :---: |
 | ![Hopper](outputs/hopper.gif) | ![Swimmer](outputs/swimmer.gif) | ![HalfCheetah](outputs/half_cheetah.gif) | ![Walker2D](outputs/walker2d.gif) |
+
+|               Spin               |   Reach    |  ??? |  ???  |
+|:--------------------------------:|:----------:|:----:|:-----:|
+| ![Finger Spin](outputs/spin.gif) | ![Reach](outputs/reach.gif) |  |  |
+
+### Playground
+The code comes with a terminal based playground for testing trained agents and visualizing their behavior.
+
+<img src="outputs/terminalapp.png" width="640" />

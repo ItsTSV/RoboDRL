@@ -52,6 +52,7 @@ class EnvironmentManager:
             self.env,
             video_folder,
             episode_trigger=lambda episode_id: True,
+            name_prefix="agent_video"
         )
 
     def save_normalization_parameters(self, path):

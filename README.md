@@ -19,10 +19,14 @@ more clear, for a price of very slight redundancy.
   - [x] Hopper-v5  
   - [x] HalfCheetah-v5
   - [x] Walker2D-v5
-- [ ] Panda-gym?
+- [x] DeepMind Control Suite
+  - [x] Finger
+  - [x] Reacher
+  - [ ] ...
 
 ### Trained models:
-Trained models, which were used in thesis for benchmarks, are stored in ```models/``` folder.
+Trained models, which were used in thesis for benchmarks, are stored in ```models/``` folder. You can also find them 
+alongside videos & benchmarking data on [Hugging Face](https://huggingface.co/collections/ItsTSV/robodrl)
 
 ### Training logs and videos:
 Training logs, charts etc. are stored using Weights & Biases. Can be either offline or online (with user account)

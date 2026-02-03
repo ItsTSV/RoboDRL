@@ -59,3 +59,37 @@ def get_sb3_args():
 
     return args
 
+
+def get_hf_args():
+    """Get attributes for HuggingFace mass upload."""
+    parser = ap.ArgumentParser(
+        description="HuggingFace upload manager"
+    )
+    parser.add_argument(
+        "--username",
+        type=str,
+        help="Username that will be used to create HF repositories"
+    )
+    parser.add_argument(
+        "--selection",
+        type=str,
+        default="*.yaml",
+        help="What models will be uploaded?"
+    )
+    parser.add_argument(
+        "--collection",
+        type=str,
+        help="URL of HuggingFace collection"
+    )
+    parser.add_argument(
+        "--skip-existing",
+        type=bool,
+        default=True,
+        help="Whether to skip models for which repositories already exist"
+    )
+
+    args = parser.parse_args()
+    if args.username is None:
+        raise ValueError("Please, provide your username with --username <str> switch")
+
+    return args

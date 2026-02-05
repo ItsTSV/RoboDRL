@@ -20,9 +20,9 @@ more clear, for a price of very slight redundancy.
   - [x] HalfCheetah-v5
   - [x] Walker2D-v5
 - [x] DeepMind Control Suite
-  - [x] Finger
+  - [x] Finger Spin
   - [x] Reacher
-  - [ ] ...
+  - [x] Cartpole Swingup
 
 ### Trained models:
 Trained models, which were used in thesis for benchmarks, are stored in ```models/``` folder. You can also find them 
@@ -75,11 +75,11 @@ Because moving images are a bit more interesting than static text ;)
 | :---: |:-------------------------------:|:----------------------------------------:| :---: |
 | ![Hopper](outputs/hopper.gif) | ![Swimmer](outputs/swimmer.gif) | ![HalfCheetah](outputs/half_cheetah.gif) | ![Walker2D](outputs/walker2d.gif) |
 
-|               Spin               |   Reach    |  ??? |  ???  |
-|:--------------------------------:|:----------:|:----:|:-----:|
-| ![Finger Spin](outputs/spin.gif) | ![Reach](outputs/reach.gif) |  |  |
+|           Finger Spin            |   Reach    |                 Cartpole Swingup                  |
+|:--------------------------------:|:----------:|:-------------------------------------------------:|
+| ![Finger Spin](outputs/spin.gif) | ![Reach](outputs/reach.gif) | ![Cartpole Swingup](outputs/cartpole_swingup.gif) |
 
 ### Playground
 The code comes with a terminal based playground for testing trained agents and visualizing their behavior.
 
-<img src="outputs/terminalapp.png" width="640" />
+<img src="outputs/terminalapp.png" width="1080" />

@@ -1,5 +1,5 @@
 import os
-import numpy as np
+import multiprocessing
 import pandas as pd
 from pathlib import Path
 from textual.app import App, ComposeResult
@@ -18,11 +18,7 @@ from textual.widgets import (
 from textual.containers import VerticalScroll, Horizontal
 from textual.validation import Regex
 from src.utils.data_lab import generate_distribution_plot, generate_scatter_plot
-from src.shared.wandb_wrapper import WandbWrapper
-from src.shared.environment_manager import EnvironmentManager
-from src.ppo.agent_continuous import PPOAgentContinuous
-from src.sac.agent import SACAgent
-from src.td3.agent import TD3Agent
+from src.utils.launcher import run_episode_task
 
 
 class RlPlayground(App):
@@ -64,7 +60,6 @@ class RlPlayground(App):
         self.render_mode = None
         self.num_trials = 1
         self.generate_csv_log = False
-        self.delay_rendering = False
         self.generate_chart_report = False
 
         # Path stuff
@@ -98,7 +93,6 @@ class RlPlayground(App):
                 yield RadioButton("No Rendering")
                 yield RadioButton("Human Rendering")
                 yield RadioButton("Video Rendering")
-            yield Checkbox("Delay Rendering", id="delay_rendering_checkbox")
 
             # Trial runner
             yield Markdown("# How many trials?")
@@ -154,8 +148,6 @@ class RlPlayground(App):
             self.generate_csv_log = bool(event.value)
         elif event.checkbox.id == "chart_report_checkbox":
             self.generate_chart_report = bool(event.value)
-        elif event.checkbox.id == "delay_rendering_checkbox":
-            self.delay_rendering = bool(event.value)
 
     def _update_progress_bar(self) -> None:
         self.query_one(ProgressBar).advance(1)
@@ -175,19 +167,17 @@ class RlPlayground(App):
             return
 
         self.call_later(self.log_summary)
+
         try:
-            wdb = WandbWrapper(self.config_path, mode="disabled")
-            env = self._setup_environment(wdb)
-            agent = self._setup_agent(env, wdb)
-            results_df = self._execute_trial_loop(agent)
-            self._process_results(results_df)
+            results_df = self._execute_trial_loop()
+
+            if not results_df.empty:
+                self._process_results(results_df)
+            else:
+                self.call_later(self.log_message, "[bold red]No results collected due to errors.[/bold red]")
         except Exception as e:
-            self.call_later(
-                self.log_message, f"[bold red]Critical Error:[/bold red] {e}"
-            )
+            self.call_later(self.log_message, f"[bold red]Critical Error:[/bold red] {e}")
         finally:
-            env.close()
-            wdb.finish()
             self.call_later(self.log_message, "[bold blue]Trials finished[/bold blue]")
 
     def _validate_configuration(self) -> bool:
@@ -200,92 +190,44 @@ class RlPlayground(App):
             return False
         return True
 
-    def _setup_environment(self, wdb):
-        """Initializes the gym environment based on config."""
-        env_name = wdb.get_hyperparameter("environment")
-        render_mode = "human" if self.render_mode == "Human Rendering" else "rgb_array"
-
-        env = EnvironmentManager(env_name, render_mode)
-        env.build_continuous()
-
-        if self.render_mode == "Video Rendering":
-            env.build_video_recorder()
-
-        return env
-
-    def _setup_agent(self, env, wdb):
-        """Initializes the agent and loads weights."""
-        algorithm = wdb.get_hyperparameter("algorithm")
-
-        if algorithm == "PPO Continuous":
-            agent = PPOAgentContinuous(env, wdb)
-        elif algorithm == "SAC":
-            agent = SACAgent(env, wdb)
-        elif algorithm == "TD3":
-            agent = TD3Agent(env, wdb)
-        else:
-            raise ValueError(f"Unsupported algorithm: {algorithm}")
-
-        if "RANDOM POLICY" not in self.model_path:
-            try:
-                agent.load_model(agent.actor, self.model_path)
-            except RuntimeError:
-                self.call_later(
-                    self.log_message,
-                    "[bold red]Make sure the model is compatible with selected agent![/bold red]",
-                )
-                raise
-
-        return agent
-
-    def _execute_trial_loop(self, agent) -> pd.DataFrame:
-        """Runs the episodes and collects data."""
+    def _execute_trial_loop(self) -> pd.DataFrame:
+        """Executes the trial loop in separate process to prevent OpenGL shenanigans."""
         data = []
+        ctx = multiprocessing.get_context("spawn")
 
-        for i in range(self.num_trials):
-            reward, steps, info = agent.play(delay=self.delay_rendering)
+        with ctx.Pool(processes=1) as pool:
+            for i in range(self.num_trials):
+                try:
+                    result = pool.apply(
+                        run_episode_task,
+                        args=(self.config_path, self.model_path, self.render_mode)
+                    )
 
-            if isinstance(reward, (tuple, list, np.ndarray)):
-                reward = float(reward[0])
+                    if "error" in result:
+                        self.call_later(self.log_message, f"[bold red]Trial {i} Error:[/bold red] {result['error']}")
+                        continue
 
-            success_rate = info.get("success_rate", -1)
-            data.append(
-                {
-                    "Trial": i,
-                    "Reward": reward,
-                    "Steps": steps,
-                    "Success Rate": success_rate,
-                }
-            )
+                    reward = result["reward"]
+                    steps = result["steps"]
 
-            self._log_trial_status(i, reward, success_rate)
-            self._update_progress_bar()
+                    data.append({
+                        "Trial": i,
+                        "Reward": reward,
+                        "Steps": steps,
+                    })
+
+                    self._log_trial_status(i, reward)
+
+                except Exception as e:
+                    self.call_later(self.log_message, f"[bold red]Process Error:[/bold red] {e}")
+
+                self.call_later(self.query_one(ProgressBar).advance, 1)
 
         return pd.DataFrame(data)
 
     def _process_results(self, df: pd.DataFrame):
-        """Calculates stats, saves CSV and generates charts."""
-        self.call_later(
-            self.log_message,
-            f"[bold magenta]Average Reward:[/bold magenta] {df['Reward'].mean()}",
-        )
-        self.call_later(
-            self.log_message,
-            f"[bold magenta]Reward Std Dev:[/bold magenta] {df['Reward'].std()}",
-        )
-
-        success_rate = df["Success Rate"].mean()
-        if success_rate != -1:
-            self.call_later(
-                self.log_message,
-                f"[bold magenta]Avg Success Rate:[/bold magenta] {df['Success Rate'].mean()}",
-            )
-            msg = (
-                "[bold green] Success! [/bold green]"
-                if success_rate >= 0.9
-                else "[bold red] Failure! [/bold red]"
-            )
-            self.call_later(self.log_message, msg)
+        self.call_later(self.log_message, f"[bold magenta]Average Reward:[/bold magenta] {df['Reward'].mean():.2f}")
+        self.call_later(self.log_message, f"[bold magenta]Reward Std Dev:[/bold magenta] {df['Reward'].std():.2f}")
 
         output_dir = self.project_root / "outputs"
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -299,7 +241,7 @@ class RlPlayground(App):
             csv_path = str(output_dir / f"{run_name}_run.csv")
             df.to_csv(csv_path)
 
-    def _log_trial_status(self, i, reward, success_rate):
+    def _log_trial_status(self, i, reward):
         """Helper to log single trial result to GUI."""
         self.call_later(
             self.log_message,

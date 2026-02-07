@@ -73,11 +73,15 @@ def upload_to_hf(config_path: Path, username: str, collection: str = None):
         path_in_repo="README.md",
         repo_id=repo_id
     )
+
+    while not video_path.exists():
+        continue
     api.upload_file(
         path_or_fileobj=video_path,
         path_in_repo="replay.mp4",
         repo_id=repo_id
     )
+    video_path.unlink()
 
     print(f"Done! The repository can be found at: https://huggingface.co/{repo_id}")
 

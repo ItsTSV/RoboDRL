@@ -1,0 +1,36 @@
+# This file is used to configure logging and agents behaviour.
+#
+# The first part consists of Wandb info used to log experiments.
+# Changing it adjusts the way logging is stored and displayed.
+#
+# The second part (config) is used to change hyperparameter settings of agents.
+# Changing it adjusts the way agents behave and learn.
+project: "DM Control Cartpole Swingup"
+name: "TD3"
+dir: "logs"
+notes: "Training DM Control Cartpole Swingup using TD3"
+monitor_gym: "False"
+config:
+  # Environment, logging and saving control
+  environment: "dm_control/cartpole-swingup"  # Environment to use
+  algorithm: "TD3"                            # What kind of algorithm to use?
+  save_dir: "models"                          # Where to save model?
+  save_name: "td3_control_swingup"            # Model name
+  save_interval: 50                           # How many previous episodes will be used to calculate mean reward?
+  total_steps: 1_000_000                      # For how many steps will the agent train?
+  # Algorithm hyperparameters
+  memory_size: 1000000                        # How many steps can fit into the memory?
+  learning_rate_q: 0.0003                     # Learning rate for Q-Network
+  learning_rate_actor: 0.0003                 # Learning rate for Actor network
+  tau: 0.005                                  # Interpolation factor in target network updates
+  warmup_steps: 10_000                        # How many steps before agents starts optimising?
+  batch_size: 256                             # How many steps are sampled from memory when optimising?
+  gamma: 0.99                                 # Discount factor
+  exploration_noise: 0.1                      # Noise that is added to actor during action selection
+  policy_noise: 0.2                           # Noise that is added to actor during network optimization
+  noise_clip: 0.5                             # Min/Max noise value
+  policy_interval: 2                          # How often will the actor and target networks be updated?
+  network_size: 256                           # Number of neurons in each hidden layer
+  max_grad_norm: 10.0                         # Gradient clipping constant to prevent grad explosion
+  reward_scale: 1.0                           # Used for reward scaling
+  normalize_rewards: 0                        # Whether to normalize rewards or not (1 = True, 0 = False)

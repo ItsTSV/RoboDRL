@@ -1,0 +1,35 @@
+# This file is used to configure logging and agents behaviour.
+#
+# The first part consists of Wandb info used to log experiments.
+# Changing it adjusts the way logging is stored and displayed.
+#
+# The second part (config) is used to change hyperparameter settings of agents.
+# Changing it adjusts the way agents behave and learn.
+project: "DM Control Cartpole Swingup"
+name: "SAC"
+dir: "logs"
+notes: "Training DM Control Cartpole Swingup using SAC"
+monitor_gym: "False"
+config:
+  # Environment, logging and saving control
+  environment: "dm_control/cartpole-swingup"  # Environment to use
+  algorithm: "SAC"                            # What kind of algorithm to use?
+  save_dir: "models"                          # Where to save model?
+  save_name: "sac_control_swingup"            # Model name
+  save_interval: 50                           # How many previous episodes will be used to calculate mean reward?
+  total_steps: 1_000_000                      # For how many steps will the agent train?
+  # Algorithm hyperparameters
+  memory_size: 1_000_000                      # How many steps can fit into the memory?
+  learning_rate_q: 0.0003                     # Learning rate for Q-Network
+  learning_rate_actor: 0.0003                 # Learning rate for Actor network
+  tau: 0.005                                  # Interpolation factor in target network updates
+  warmup_steps: 10_000                        # How many steps before agents starts optimising?
+  log_std_min: -20                            # Std normalisation lower bound (Standard SAC implementation value)
+  log_std_max: 2                              # Std normalisation upper bound
+  batch_size: 256                             # How many steps are sampled from memory when optimising?
+  gamma: 0.99                                 # Discount factor
+  network_size: 256                           # Number of neurons in each hidden layer
+  max_grad_norm: 1.0                          # Gradient clipping constant to prevent grad explosion
+  reward_scale: 1.0                           # Rewards need to be scaled for entropy temperature
+  policy_update_frequency: 1                  # How often will the policy be updated?
+  normalize_rewards: 0                        # Whether to normalize rewards or not (1 = True, 0 = False)

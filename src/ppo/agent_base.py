@@ -23,7 +23,6 @@ class PPOAgentBase(TemplateAgent, ABC):
         """
         super().__init__(environment, wandb)
 
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.actor = model.to(self.device)
         self.memory = RolloutBuffer()
 

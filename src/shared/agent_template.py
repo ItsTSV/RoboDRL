@@ -15,6 +15,7 @@ class TemplateAgent:
             environment (EnvironmentManager): The environment in which the agent operates.
             wandb (WandbWrapper): Wandb wrapper for tracking and hyperparameter management.
         """
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.env = environment
         self.wdb = wandb
         if self.wdb.get_hyperparameter("normalize_rewards"):
@@ -61,7 +62,7 @@ class TemplateAgent:
         if not model_path.exists():
             raise FileNotFoundError(f"Model path does not exist: {model_path}")
 
-        actor.load_state_dict(torch.load(model_path, weights_only=True))
+        actor.load_state_dict(torch.load(model_path, weights_only=True, map_location=self.device))
         actor.eval()
 
         rms_path = model_path.parent / (model_path.stem + "_rms.npz")

@@ -24,7 +24,6 @@ class SACAgent(TemplateAgent):
         """
         super().__init__(environment, wandb)
 
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         network_size = self.wdb.get_hyperparameter("network_size")
         action_count, state_count = self.env.get_dimensions()
 

@@ -27,7 +27,7 @@ def generate_distribution_plot(df: pd.DataFrame, name: str, output_dir: Path):
         color=palette[0],
         bins=8 if len(df) > 50 else 4
     )
-    plot.figure.suptitle(f"Reward Distribution of {name} (N = {len(df)})")
+    plot.figure.suptitle(f"Reward distribution of {name} (N = {len(df)})")
     plot.set_axis_labels("Reward", "Number of Trials")
 
     plt.axvline(mean, color=palette[1], linestyle="solid", label=f"Mean {mean:.2f}")
@@ -55,7 +55,7 @@ def generate_scatter_plot(df: pd.DataFrame, name: str, output_dir: Path):
         x="Steps",
         y="Reward",
     )
-    plot.set_title(f"Step-Reward Distribution of {name} (N = {len(df)})")
+    plot.set_title(f"Step-reward scatterplot of {name} (N = {len(df)})")
 
     save_path = output_dir / f"{name}_scatter.png"
     plot.figure.savefig(save_path)

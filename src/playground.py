@@ -2,21 +2,18 @@ import os
 import multiprocessing
 import pandas as pd
 from pathlib import Path
+from textual import on
 from textual.app import App, ComposeResult
 from textual.widgets import (
     Header,
     Footer,
-    RadioSet,
-    RadioButton,
-    Markdown,
     Checkbox,
     Input,
     Button,
     RichLog,
-    ProgressBar,
+    ProgressBar, Label, Select, Digits
 )
-from textual.containers import VerticalScroll, Horizontal
-from textual.validation import Regex
+from textual.containers import Horizontal, Vertical
 from src.utils.data_lab import generate_distribution_plot, generate_scatter_plot
 from src.utils.launcher import run_episode_task
 
@@ -24,37 +21,12 @@ from src.utils.launcher import run_episode_task
 class RlPlayground(App):
     """A Textual app to test RL agents"""
 
-    CSS = """
-        #debug_output {
-            height: 12;       
-            border: solid $primary;
-            margin-top: 1;
-            background: $surface;
-        }
-        
-        .row {
-        height: auto;           
-        width: 100%;  
-        margin-bottom: 1;     
-        align: left middle;
-        }
-        
-        Button {
-        margin-left: 2;
-        }
-        
-        ProgressBar {
-        width: 1fr;           
-        margin-left: 2; 
-        align: left middle;
-        }
-        """
-
-    BINDINGS = [("d", "toggle_dark", "Toggle dark mode")]
+    CSS_PATH = "utils/playground.tcss"
 
     def __init__(self):
         super().__init__()
         # Application variables
+        self.theme = "tokyo-night"
         self.config_path = None
         self.model_path = None
         self.render_mode = None
@@ -68,106 +40,90 @@ class RlPlayground(App):
         self.models_dir = self.project_root / "models"
 
     def compose(self) -> ComposeResult:
-        """Create child widgets for the app"""
         yield Header(show_clock=True)
 
-        with VerticalScroll():
-            # Configuration file selector
-            yield Markdown("# Select Configuration File")
-            with RadioSet(id="config_selector"):
-                for config_file_path in self.config_dir.glob("*.yaml"):
-                    display_name = str(config_file_path.relative_to(self.project_root))
-                    yield RadioButton(display_name)
+        # Left config sidebar
+        with Vertical(id="sidebar"):
+            yield Label("Configuration", classes="section-title")
 
-            # Model selector
-            yield Markdown("# Select Model File")
-            with RadioSet(id="model_selector"):
-                for model_file_path in self.models_dir.glob("*.pth"):
-                    display_name = str(model_file_path.relative_to(self.project_root))
-                    yield RadioButton(display_name)
-                yield RadioButton("RANDOM POLICY")
-
-            # Render settings
-            yield Markdown("# Render Settings")
-            with RadioSet(id="render_selector"):
-                yield RadioButton("No Rendering")
-                yield RadioButton("Human Rendering")
-                yield RadioButton("Video Rendering")
-
-            # Trial runner
-            yield Markdown("# How many trials?")
-            yield Input(
-                placeholder="Enter number of trials",
-                id="trial_input",
-                validators=[
-                    Regex(
-                        regex=r"^\d+$", failure_description="Must be a positive integer"
-                    )
-                ],
+            yield Label("Config File:")
+            yield Select(
+                [(str(p.name), str(p)) for p in self.config_dir.glob("*.yaml")],
+                prompt="Select Config...",
+                id="config_selector"
             )
 
-            # Additional settings
-            yield Markdown("# Additional Settings")
-            with Horizontal(classes="row"):
-                yield Checkbox("Generate CSV Log", id="csv_log_checkbox")
-                yield Checkbox("Generate Chart Report", id="chart_report_checkbox")
+            yield Label("Model File:", classes="section-title")
+            model_options = [(str(p.name), str(p)) for p in self.models_dir.glob("*.pth")]
+            model_options.append(("RANDOM POLICY", "RANDOM"))
+            yield Select(
+                model_options,
+                prompt="Select Model...",
+                id="model_selector"
+            )
 
-            with Horizontal(classes="row"):
-                yield Button("Confirm and run", id="run_button", variant="primary")
-            with Horizontal(classes="row"):
-                yield ProgressBar(show_eta=False)
-            yield RichLog(id="debug_output", markup=True, wrap=True)
+            yield Label("Render Mode:", classes="section-title")
+            yield Select(
+                [("None", "No Rendering"), ("Human", "Human Rendering"), ("Video", "Video Rendering")],
+                value="No Rendering",
+                allow_blank=False,
+                id="render_selector"
+            )
+
+            yield Label("Trials:", classes="section-title")
+            yield Input(placeholder="1", value="1", type="integer", id="trial_input")
+
+            yield Label("Options:", classes="section-title")
+            yield Checkbox("Save CSV Log", id="csv_log")
+            yield Checkbox("Generate Charts", id="chart_report")
+
+            yield Button("Run Experiment", id="run_button", variant="success")
+
+        # Right output area
+        with Vertical(id="main_content"):
+            with Horizontal(id="stat_display"):
+                with Vertical():
+                    yield Label("Last Reward")
+                    yield Digits("0.00", id="score_display")
+                with Vertical():
+                    yield Label("Avg Reward")
+                    yield Digits("0.00", id="avg_display")
+
+            with Horizontal(classes="status_row"):
+                yield Label("Progress: ", id="progress_label")
+                yield ProgressBar(total=100, id="progress_bar")
+
+            yield RichLog(id="debug_output", markup=True, wrap=True, highlight=True)
 
         yield Footer()
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle button press event to run the trials"""
-        if event.button.id == "run_button":
-            trial_input = self.query_one("#trial_input", Input)
-            self.num_trials = (
-                int(trial_input.value)
-                if trial_input.value and trial_input.is_valid
-                else 1
-            )
-            self.run_worker(self.run_trials, exclusive=True, thread=True)
+    @on(Button.Pressed, "#run_button")
+    def start_experiments(self) -> None:
+        """Launches the trials when Run button is pressed"""
 
-    def on_radio_set_changed(self, event: RadioSet.Changed) -> None:
-        """Handle radio set change events to log selections"""
-        if event.radio_set.id == "config_selector":
-            relative_path_str = str(event.pressed.label)
-            self.config_path = str(self.project_root / relative_path_str)
-        elif event.radio_set.id == "model_selector":
-            relative_path_str = str(event.pressed.label)
-            self.model_path = str(self.project_root / relative_path_str)
-        elif event.radio_set.id == "render_selector":
-            self.render_mode = os.path.normpath(str(event.pressed.label))
+        self.config_path = self.query_one("#config_selector", Select).value
+        self.model_path = self.query_one("#model_selector", Select).value
+        self.render_mode = self.query_one("#render_selector", Select).value
 
-    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
-        """Handle checkbox change events to log additional settings"""
-        if event.checkbox.id == "csv_log_checkbox":
-            self.generate_csv_log = bool(event.value)
-        elif event.checkbox.id == "chart_report_checkbox":
-            self.generate_chart_report = bool(event.value)
+        trial_val = self.query_one("#trial_input", Input).value
+        self.num_trials = int(trial_val) if trial_val and trial_val.isdigit() else 1
 
-    def _update_progress_bar(self) -> None:
-        self.query_one(ProgressBar).advance(1)
+        self.generate_csv_log = self.query_one("#csv_log", Checkbox).value
+        self.generate_chart_report = self.query_one("#chart_report", Checkbox).value
 
-    def action_toggle_dark(self) -> None:
-        """An action to toggle dark mode"""
-        self.theme = (
-            "textual-dark" if self.theme == "textual-light" else "textual-light"
-        )
+        if self.config_path == Select.BLANK or self.model_path == Select.BLANK or self.render_mode == Select.BLANK:
+            self.log_message("[bold red]Error:[/bold red] Please select Config, Model, and Render Mode.")
+            return
+
+        self.query_one("#run_button", Button).disabled = True
+        self.query_one("#progress_bar", ProgressBar).update(progress=0, total=self.num_trials)
+        self.clear_log()
+        self.log_summary()
+
+        self.run_worker(self.run_trials, exclusive=True, thread=True)
 
     def run_trials(self):
         """Sets up the whole init-trial-report data process"""
-        self.call_later(self.clear_log)
-        self.query_one(ProgressBar).update(progress=0, total=self.num_trials)
-
-        if not self._validate_configuration():
-            return
-
-        self.call_later(self.log_summary)
-
         try:
             results_df = self._execute_trial_loop()
 
@@ -179,20 +135,11 @@ class RlPlayground(App):
             self.call_later(self.log_message, f"[bold red]Critical Error:[/bold red] {e}")
         finally:
             self.call_later(self.log_message, "[bold blue]Trials finished[/bold blue]")
-
-    def _validate_configuration(self) -> bool:
-        """Checks if all necessary paths and modes are selected."""
-        if not all([self.config_path, self.model_path, self.render_mode]):
-            self.call_later(
-                self.log_message,
-                "[bold red]Error:[/bold red] Please make all selections before running trials.",
-            )
-            return False
-        return True
+            self.call_later(lambda: setattr(self.query_one("#run_button", Button), "disabled", False))
 
     def _execute_trial_loop(self) -> pd.DataFrame:
         """Executes the trial loop in separate process to prevent OpenGL shenanigans."""
-        data = []
+        data = pd.DataFrame(columns=["Trial", "Reward", "Steps"])
         ctx = multiprocessing.get_context("spawn")
 
         with ctx.Pool(processes=1) as pool:
@@ -210,23 +157,23 @@ class RlPlayground(App):
                     reward = result["reward"]
                     steps = result["steps"]
 
-                    data.append({
-                        "Trial": i,
-                        "Reward": reward,
-                        "Steps": steps,
-                    })
+                    data.loc[len(data)] = {"Trial": i + 1, "Reward": reward, "Steps": steps}
 
-                    self._log_trial_status(i, reward)
+                    self._log_trial_status(i, reward, data["Reward"].mean())
 
                 except Exception as e:
                     self.call_later(self.log_message, f"[bold red]Process Error:[/bold red] {e}")
 
-                self.call_later(self.query_one(ProgressBar).advance, 1)
+                self.call_later(lambda: self.query_one("#progress_bar", ProgressBar).advance(1))
 
-        return pd.DataFrame(data)
+        return data
 
     def _process_results(self, df: pd.DataFrame):
-        self.call_later(self.log_message, f"[bold magenta]Average Reward:[/bold magenta] {df['Reward'].mean():.2f}")
+        """Processes the results DataFrame to log summary statistics and generate reports."""
+        avg_reward = df["Reward"].mean()
+
+        self.call_later(lambda: self.query_one("#avg_display", Digits).update(f"{avg_reward:.2f}"))
+        self.call_later(self.log_message, f"[bold magenta]Average Reward:[/bold magenta] {avg_reward:.2f}")
         self.call_later(self.log_message, f"[bold magenta]Reward Std Dev:[/bold magenta] {df['Reward'].std():.2f}")
 
         output_dir = self.project_root / "outputs"
@@ -241,17 +188,27 @@ class RlPlayground(App):
             csv_path = str(output_dir / f"{run_name}_run.csv")
             df.to_csv(csv_path)
 
-    def _log_trial_status(self, i, reward):
+    def _log_trial_status(self, i, last_reward, avg_reward):
         """Helper to log single trial result to GUI."""
+        self.call_later(lambda: self.query_one("#score_display", Digits).update(f"{last_reward:.2f}"))
+
+        avg_widget = self.query_one("#avg_display", Digits)
+        previous_avg = float(avg_widget.value)
+        avg_widget.styles.color = "#44FF44" if avg_reward > previous_avg else "#FF4444"
+        self.call_later(lambda: self.query_one("#avg_display", Digits).update(f"{avg_reward:.2f}"))
+
         self.call_later(
             self.log_message,
-            f"[bold yellow]Trial {i + 1} Reward:[/bold yellow] {reward}",
+            f"[bold yellow]Trial {i + 1} Reward:[/bold yellow] {last_reward:.2f}",
         )
 
     def log_summary(self):
         """Thread-safe method for writing trial summary"""
-        debug_output = self.query_one(RichLog)
+        debug_output = self.query_one("#debug_output", RichLog)
         debug_output.clear()
+        self.query_one("#score_display", Digits).update("0.00")
+        self.query_one("#avg_display", Digits).update("0.00")
+
         debug_output.write(
             f"[bold green]Configuration File:[/bold green] {self.config_path}"
         )
@@ -270,13 +227,11 @@ class RlPlayground(App):
 
     def log_message(self, text: str):
         """Thread-safe method for logging outputs"""
-        debug_output = self.query_one(RichLog)
-        debug_output.write(text)
+        self.query_one("#debug_output", RichLog).write(text)
 
     def clear_log(self):
         """Thread-safe method for clearing log"""
-        debug_output = self.query_one(RichLog)
-        debug_output.clear()
+        self.query_one("#debug_output", RichLog).clear()
 
 
 if __name__ == "__main__":

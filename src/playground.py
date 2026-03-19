@@ -13,7 +13,7 @@ from textual.widgets import (
     RichLog,
     ProgressBar, Label, Select, Digits
 )
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from src.utils.data_lab import generate_distribution_plot, generate_scatter_plot
 from src.utils.launcher import run_episode_task
 
@@ -43,7 +43,7 @@ class RlPlayground(App):
         yield Header(show_clock=True)
 
         # Left config sidebar
-        with Vertical(id="sidebar"):
+        with VerticalScroll(id="sidebar"):
             yield Label("Configuration", classes="section-title")
 
             yield Label("Config File:")

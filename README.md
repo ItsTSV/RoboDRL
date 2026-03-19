@@ -62,7 +62,8 @@ It relies on PyTorch (tested with CUDA 12.8), Gymnasium and MuJoCo.
 ```bash
 pip install -r requirements.txt
 ```
-If you have a different CUDA version, you might need to install PyTorch manually.
+If you have a different CUDA version, you might need to install PyTorch manually. DM Control Suite has recently updated
+the underlying MuJoCo engine; due to different dynamics, the trained models only work for version that is given in the requirements.
 
 ### Training
 To train an agent, run the main script with a config file:
@@ -71,7 +72,7 @@ python -m src.main --config <config-path>
 ```
 
 ### Playground
-I included a simple terminal-based tool to visualize trained agents and benchmark their performance:
+I included a simple terminal-based tool to visualise trained agents and benchmark their performance:
 ```bash
 python -m src.playground
 ```
